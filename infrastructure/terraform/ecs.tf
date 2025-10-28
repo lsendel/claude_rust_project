@@ -367,7 +367,7 @@ resource "aws_ecs_service" "backend" {
 
   network_configuration {
     subnets          = aws_subnet.private[*].id
-    security_groups  = [aws_security_group.ecs_tasks.id]
+    security_groups  = [aws_security_group.application.id]
     assign_public_ip = false
   }
 
