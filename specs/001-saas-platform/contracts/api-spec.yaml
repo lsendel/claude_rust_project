@@ -1,0 +1,344 @@
+openapi: 3.0.3
+info:
+  title: Multi-Tenant SaaS Platform API
+  description: REST API for multi-tenant project management SaaS platform
+  version: 1.0.0
+  contact:
+    name: Platform Team
+servers:
+  - url: https://{tenant}.platform.com/api
+    description: Production (tenant-specific subdomain)
+    variables:
+      tenant:
+        default: demo
+        description: Tenant subdomain
+  - url: http://localhost:8080/api
+    description: Local development
+security:
+  - BearerAuth: []
+tags:
+  - name: Authentication
+  - name: Tenants
+  - name: Users
+  - name: Projects
+  - name: Tasks
+  - name: Automation
+paths:
+  /oauth2/authorization/{provider}:
+    get:
+      tags: [Authentication]
+      summary: Initiate OAuth2 flow
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [google, facebook, github]
+      responses:
+        '302':
+          description: Redirect to OAuth2 provider
+  /tenants:
+    post:
+      tags: [Tenants]
+      summary: Create new tenant (sign-up)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTenantRequest'
+      responses:
+        '201':
+          description: Tenant created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Subdomain already exists
+  /tenants/{tenantId}:
+    get:
+      tags: [Tenants]
+      summary: Get tenant details
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /tenants/{tenantId}/usage:
+    get:
+      tags: [Tenants]
+      summary: Get quota usage
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuotaUsage'
+  /tenants/{tenantId}/projects:
+    get:
+      tags: [Projects]
+      summary: List projects
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [PLANNING, ACTIVE, ON_HOLD, COMPLETED, ARCHIVED]
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Project'
+    post:
+      tags: [Projects]
+      summary: Create project
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectRequest'
+      responses:
+        '201':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '402':
+          description: Quota exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuotaError'
+  /tenants/{tenantId}/projects/{projectId}:
+    get:
+      tags: [Projects]
+      summary: Get project details
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+    put:
+      tags: [Projects]
+      summary: Update project
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProjectRequest'
+      responses:
+        '200':
+          description: Project updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+    delete:
+      tags: [Projects]
+      summary: Delete project
+      parameters:
+        - $ref: '#/components/parameters/TenantId'
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '204':
+          description: Project deleted
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: AWS Cognito JWT token
+  parameters:
+    TenantId:
+      name: tenantId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    CreateTenantRequest:
+      type: object
+      required: [subdomain, name, email]
+      properties:
+        subdomain:
+          type: string
+          pattern: '^[a-z0-9-]{3,63}$'
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        email:
+          type: string
+          format: email
+    Tenant:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        subdomain:
+          type: string
+        name:
+          type: string
+        subscriptionTier:
+          type: string
+          enum: [FREE, PRO, ENTERPRISE]
+        quotaLimit:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+    QuotaUsage:
+      type: object
+      properties:
+        currentUsage:
+          type: integer
+        quotaLimit:
+          type: integer
+        subscriptionTier:
+          type: string
+        percentageUsed:
+          type: number
+    CreateProjectRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+        dueDate:
+          type: string
+          format: date
+        priority:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+    UpdateProjectRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [PLANNING, ACTIVE, ON_HOLD, COMPLETED, ARCHIVED]
+        dueDate:
+          type: string
+          format: date
+        progressPercentage:
+          type: integer
+          minimum: 0
+          maximum: 100
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        dueDate:
+          type: string
+          format: date
+        ownerId:
+          type: string
+          format: uuid
+        progressPercentage:
+          type: integer
+        priority:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    QuotaError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: QUOTA_EXCEEDED
+        message:
+          type: string
+        currentUsage:
+          type: integer
+        quotaLimit:
+          type: integer
+        currentTier:
+          type: string
+        upgradeUrl:
+          type: string
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+    Forbidden:
+      description: Forbidden - insufficient permissions
+    NotFound:
+      description: Resource not found

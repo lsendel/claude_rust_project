@@ -1,0 +1,116 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Domain Events Schema",
+  "description": "EventBridge event schemas for the multi-tenant SaaS platform",
+  "definitions": {
+    "BaseEvent": {
+      "type": "object",
+      "required": ["eventType", "eventVersion", "timestamp", "tenantId", "userId", "payload"],
+      "properties": {
+        "eventType": {
+          "type": "string",
+          "description": "Event type identifier (e.g., project.created)"
+        },
+        "eventVersion": {
+          "type": "string",
+          "description": "Event schema version (semantic versioning)"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of event occurrence"
+        },
+        "tenantId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Tenant identifier for multi-tenant isolation"
+        },
+        "userId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "User who triggered the event"
+        },
+        "payload": {
+          "type": "object",
+          "description": "Event-specific data"
+        }
+      }
+    },
+    "ProjectCreated": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "properties": {
+            "eventType": { "const": "project.created" },
+            "payload": {
+              "type": "object",
+              "required": ["projectId", "name", "status"],
+              "properties": {
+                "projectId": { "type": "string", "format": "uuid" },
+                "name": { "type": "string" },
+                "status": { "type": "string", "enum": ["PLANNING", "ACTIVE"] },
+                "dueDate": { "type": "string", "format": "date" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ProjectUpdated": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "properties": {
+            "eventType": { "const": "project.updated" },
+            "payload": {
+              "type": "object",
+              "required": ["projectId", "changes"],
+              "properties": {
+                "projectId": { "type": "string", "format": "uuid" },
+                "changes": {
+                  "type": "object",
+                  "description": "Changed fields with old and new values"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "TaskStatusChanged": {
+      "allOf": [
+        { "$ref": "#/definitions/BaseEvent" },
+        {
+          "properties": {
+            "eventType": { "const": "task.status.changed" },
+            "payload": {
+              "type": "object",
+              "required": ["taskId", "projectId", "oldStatus", "newStatus"],
+              "properties": {
+                "taskId": { "type": "string", "format": "uuid" },
+                "projectId": { "type": "string", "format": "uuid" },
+                "oldStatus": { "type": "string" },
+                "newStatus": { "type": "string" }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "examples": [
+    {
+      "eventType": "project.created",
+      "eventVersion": "1.0",
+      "timestamp": "2025-10-26T12:00:00Z",
+      "tenantId": "550e8400-e29b-41d4-a716-446655440000",
+      "userId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "payload": {
+        "projectId": "123e4567-e89b-12d3-a456-426614174000",
+        "name": "New Website Project",
+        "status": "PLANNING",
+        "dueDate": "2025-12-31"
+      }
+    }
+  ]
+}
