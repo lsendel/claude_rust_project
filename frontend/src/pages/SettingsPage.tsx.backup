@@ -1,0 +1,411 @@
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { useTenant } from '../contexts/TenantContext';
+import { userService, User, UserRole, InviteUserRequest } from '../services/userService';
+
+const SettingsPage: React.FC = () => {
+  const { user: currentUser } = useAuth();
+  const { tenant: currentTenant } = useTenant();
+
+  // State
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  // Invitation form state
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<UserRole>('VIEWER');
+  const [inviteMessage, setInviteMessage] = useState('');
+  const [inviting, setInviting] = useState(false);
+
+  // Load users
+  useEffect(() => {
+    if (currentTenant?.id) {
+      loadUsers();
+    }
+  }, [currentTenant?.id]);
+
+  const loadUsers = async () => {
+    if (!currentTenant?.id) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await userService.listUsers(currentTenant.id);
+      setUsers(data);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to load team members');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentTenant?.id) return;
+
+    setInviting(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const request: InviteUserRequest = {
+        email: inviteEmail,
+        role: inviteRole,
+        message: inviteMessage || undefined,
+      };
+
+      const response = await userService.inviteUser(currentTenant.id, request);
+
+      setSuccess(
+        response.emailSent
+          ? `Invitation sent to ${inviteEmail}`
+          : `User ${inviteEmail} added to team (email not sent)`
+      );
+
+      // Reset form
+      setInviteEmail('');
+      setInviteRole('VIEWER');
+      setInviteMessage('');
+
+      // Reload users
+      loadUsers();
+    } catch (err: any) {
+      if (err.response?.status === 403) {
+        setError('You do not have permission to invite users. Only administrators can invite users.');
+      } else {
+        setError(err.response?.data?.message || 'Failed to send invitation');
+      }
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const handleRemove = async (userId: string, userEmail: string) => {
+    if (!currentTenant?.id) return;
+    if (!window.confirm(`Are you sure you want to remove ${userEmail} from the team?`)) return;
+
+    setError(null);
+    setSuccess(null);
+
+    try {
+      await userService.removeUser(currentTenant.id, userId);
+      setSuccess(`${userEmail} has been removed from the team`);
+      loadUsers();
+    } catch (err: any) {
+      if (err.response?.status === 403) {
+        setError('You do not have permission to remove users. Only administrators can remove users.');
+      } else {
+        setError(err.response?.data?.message || 'Failed to remove user');
+      }
+    }
+  };
+
+  const getRoleBadgeStyle = (role: UserRole): React.CSSProperties => {
+    const baseStyle: React.CSSProperties = {
+      padding: '4px 12px',
+      borderRadius: '12px',
+      fontSize: '12px',
+      fontWeight: '500',
+      display: 'inline-block',
+    };
+
+    switch (role) {
+      case 'ADMINISTRATOR':
+        return { ...baseStyle, backgroundColor: '#fee2e2', color: '#991b1b' };
+      case 'EDITOR':
+        return { ...baseStyle, backgroundColor: '#dbeafe', color: '#1e40af' };
+      case 'VIEWER':
+        return { ...baseStyle, backgroundColor: '#f3f4f6', color: '#4b5563' };
+      default:
+        return baseStyle;
+    }
+  };
+
+  const containerStyle: React.CSSProperties = {
+    padding: '24px',
+    maxWidth: '1200px',
+    margin: '0 auto',
+  };
+
+  const headerStyle: React.CSSProperties = {
+    fontSize: '28px',
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: '24px',
+  };
+
+  const sectionStyle: React.CSSProperties = {
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    padding: '24px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    marginBottom: '24px',
+  };
+
+  const sectionTitleStyle: React.CSSProperties = {
+    fontSize: '20px',
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: '16px',
+  };
+
+  const formGroupStyle: React.CSSProperties = {
+    marginBottom: '16px',
+  };
+
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    marginBottom: '6px',
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#374151',
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '8px 12px',
+    border: '1px solid #d1d5db',
+    borderRadius: '6px',
+    fontSize: '14px',
+  };
+
+  const textareaStyle: React.CSSProperties = {
+    ...inputStyle,
+    minHeight: '80px',
+    resize: 'vertical' as const,
+  };
+
+  const buttonStyle: React.CSSProperties = {
+    padding: '10px 20px',
+    backgroundColor: '#2563eb',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+  };
+
+  const errorBannerStyle: React.CSSProperties = {
+    padding: '12px 16px',
+    backgroundColor: '#fee2e2',
+    border: '1px solid #fecaca',
+    borderRadius: '6px',
+    marginBottom: '16px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    color: '#991b1b',
+  };
+
+  const successBannerStyle: React.CSSProperties = {
+    padding: '12px 16px',
+    backgroundColor: '#d1fae5',
+    border: '1px solid #a7f3d0',
+    borderRadius: '6px',
+    marginBottom: '16px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    color: '#065f46',
+  };
+
+  const tableStyle: React.CSSProperties = {
+    width: '100%',
+    borderCollapse: 'collapse',
+  };
+
+  const thStyle: React.CSSProperties = {
+    textAlign: 'left' as const,
+    padding: '12px',
+    borderBottom: '2px solid #e5e7eb',
+    fontSize: '12px',
+    fontWeight: '600',
+    color: '#6b7280',
+    textTransform: 'uppercase' as const,
+  };
+
+  const tdStyle: React.CSSProperties = {
+    padding: '16px 12px',
+    borderBottom: '1px solid #f3f4f6',
+  };
+
+  const removeButtonStyle: React.CSSProperties = {
+    padding: '6px 12px',
+    border: '1px solid #dc2626',
+    borderRadius: '4px',
+    backgroundColor: 'white',
+    color: '#dc2626',
+    cursor: 'pointer',
+    fontSize: '13px',
+  };
+
+  return (
+    <div style={containerStyle}>
+      <h1 style={headerStyle}>Settings</h1>
+
+      {error && (
+        <div style={errorBannerStyle}>
+          <span>{error}</span>
+          <button
+            onClick={() => setError(null)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#991b1b',
+              cursor: 'pointer',
+              fontSize: '18px',
+              fontWeight: 'bold',
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {success && (
+        <div style={successBannerStyle}>
+          <span>{success}</span>
+          <button
+            onClick={() => setSuccess(null)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#065f46',
+              cursor: 'pointer',
+              fontSize: '18px',
+              fontWeight: 'bold',
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* Invite User Section */}
+      <div style={sectionStyle}>
+        <h2 style={sectionTitleStyle}>Invite Team Member</h2>
+        <form onSubmit={handleInvite}>
+          <div style={formGroupStyle}>
+            <label style={labelStyle} htmlFor="inviteEmail">
+              Email Address *
+            </label>
+            <input
+              id="inviteEmail"
+              type="email"
+              style={inputStyle}
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              required
+              placeholder="user@example.com"
+            />
+          </div>
+
+          <div style={formGroupStyle}>
+            <label style={labelStyle} htmlFor="inviteRole">
+              Role *
+            </label>
+            <select
+              id="inviteRole"
+              style={inputStyle}
+              value={inviteRole}
+              onChange={(e) => setInviteRole(e.target.value as UserRole)}
+            >
+              <option value="VIEWER">Viewer - Read-only access</option>
+              <option value="EDITOR">Editor - Can create and modify</option>
+              <option value="ADMINISTRATOR">Administrator - Full access</option>
+            </select>
+          </div>
+
+          <div style={formGroupStyle}>
+            <label style={labelStyle} htmlFor="inviteMessage">
+              Custom Message (Optional)
+            </label>
+            <textarea
+              id="inviteMessage"
+              style={textareaStyle}
+              value={inviteMessage}
+              onChange={(e) => setInviteMessage(e.target.value)}
+              placeholder="Add a personal message to the invitation email..."
+            />
+          </div>
+
+          <button
+            type="submit"
+            style={buttonStyle}
+            disabled={inviting}
+            onMouseOver={(e) => !inviting && (e.currentTarget.style.backgroundColor = '#1d4ed8')}
+            onMouseOut={(e) => !inviting && (e.currentTarget.style.backgroundColor = '#2563eb')}
+          >
+            {inviting ? 'Sending Invitation...' : 'Send Invitation'}
+          </button>
+        </form>
+      </div>
+
+      {/* Team Members Section */}
+      <div style={sectionStyle}>
+        <h2 style={sectionTitleStyle}>Team Members</h2>
+
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '24px', color: '#6b7280' }}>
+            Loading team members...
+          </div>
+        ) : users.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '24px', color: '#6b7280' }}>
+            No team members yet. Invite someone to get started!
+          </div>
+        ) : (
+          <table style={tableStyle}>
+            <thead>
+              <tr>
+                <th style={thStyle}>Name</th>
+                <th style={thStyle}>Email</th>
+                <th style={thStyle}>Role</th>
+                <th style={thStyle}>Joined</th>
+                <th style={thStyle}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((user) => (
+                <tr key={user.userId}>
+                  <td style={tdStyle}>
+                    <span style={{ fontWeight: '500', color: '#1f2937' }}>{user.name}</span>
+                  </td>
+                  <td style={tdStyle}>
+                    <span style={{ color: '#4b5563' }}>{user.email}</span>
+                  </td>
+                  <td style={tdStyle}>
+                    <span style={getRoleBadgeStyle(user.role)}>
+                      {user.role}
+                    </span>
+                  </td>
+                  <td style={tdStyle}>
+                    <span style={{ fontSize: '14px', color: '#6b7280' }}>
+                      {new Date(user.joinedAt).toLocaleDateString()}
+                    </span>
+                  </td>
+                  <td style={tdStyle}>
+                    {user.userId !== currentUser?.id && (
+                      <button
+                        style={removeButtonStyle}
+                        onClick={() => handleRemove(user.userId, user.email)}
+                        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#fef2f2')}
+                        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'white')}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default SettingsPage;

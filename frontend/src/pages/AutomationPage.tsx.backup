@@ -1,0 +1,726 @@
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { useTenant } from '../contexts/TenantContext';
+import {
+  automationService,
+  AutomationRule,
+  EventLog,
+  ExecutionStatus,
+} from '../services/automationService';
+
+const AutomationPage: React.FC = () => {
+  const { user } = useAuth();
+  const { tenant } = useTenant();
+
+  // State
+  const [rules, setRules] = useState<AutomationRule[]>([]);
+  const [logs, setLogs] = useState<EventLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  // View state
+  const [activeTab, setActiveTab] = useState<'rules' | 'logs'>('rules');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingRule, setEditingRule] = useState<AutomationRule | null>(null);
+
+  // Form state
+  const [formData, setFormData] = useState<Partial<AutomationRule>>({
+    name: '',
+    eventType: 'task.status.changed',
+    actionType: 'send_email',
+    conditions: {},
+    actionConfig: {},
+    isActive: true,
+  });
+
+  // Load data
+  useEffect(() => {
+    if (user && tenant) {
+      loadRules();
+      loadLogs();
+    }
+  }, [user, tenant]);
+
+  const loadRules = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await automationService.getAllRules();
+      setRules(data);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to load automation rules');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadLogs = async () => {
+    try {
+      const data = await automationService.getRecentLogs(50);
+      setLogs(data);
+    } catch (err: any) {
+      console.error('Failed to load event logs:', err);
+    }
+  };
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
+
+    try {
+      await automationService.createRule(formData as AutomationRule);
+      setSuccess('Automation rule created successfully');
+      setShowCreateModal(false);
+      resetForm();
+      loadRules();
+    } catch (err: any) {
+      if (err.response?.status === 403) {
+        setError('You do not have permission to create automation rules. Only administrators can manage automations.');
+      } else {
+        setError(err.response?.data?.message || 'Failed to create automation rule');
+      }
+    }
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRule?.id) return;
+
+    setError(null);
+    setSuccess(null);
+
+    try {
+      await automationService.updateRule(editingRule.id, formData);
+      setSuccess('Automation rule updated successfully');
+      setShowEditModal(false);
+      setEditingRule(null);
+      resetForm();
+      loadRules();
+    } catch (err: any) {
+      if (err.response?.status === 403) {
+        setError('You do not have permission to update automation rules.');
+      } else {
+        setError(err.response?.data?.message || 'Failed to update automation rule');
+      }
+    }
+  };
+
+  const handleToggleStatus = async (ruleId: string, isActive: boolean) => {
+    setError(null);
+    setSuccess(null);
+
+    try {
+      await automationService.toggleRuleStatus(ruleId, !isActive);
+      setSuccess(`Automation rule ${!isActive ? 'enabled' : 'disabled'} successfully`);
+      loadRules();
+    } catch (err: any) {
+      if (err.response?.status === 403) {
+        setError('You do not have permission to toggle automation rules.');
+      } else {
+        setError(err.response?.data?.message || 'Failed to toggle automation rule');
+      }
+    }
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to delete the automation rule "${name}"?`)) return;
+
+    setError(null);
+    setSuccess(null);
+
+    try {
+      await automationService.deleteRule(id);
+      setSuccess('Automation rule deleted successfully');
+      loadRules();
+    } catch (err: any) {
+      if (err.response?.status === 403) {
+        setError('You do not have permission to delete automation rules.');
+      } else {
+        setError(err.response?.data?.message || 'Failed to delete automation rule');
+      }
+    }
+  };
+
+  const openEditModal = (rule: AutomationRule) => {
+    setEditingRule(rule);
+    setFormData({
+      name: rule.name,
+      eventType: rule.eventType,
+      actionType: rule.actionType,
+      conditions: rule.conditions || {},
+      actionConfig: rule.actionConfig,
+      isActive: rule.isActive,
+    });
+    setShowEditModal(true);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      eventType: 'task.status.changed',
+      actionType: 'send_email',
+      conditions: {},
+      actionConfig: {},
+      isActive: true,
+    });
+  };
+
+  const getStatusBadgeStyle = (status: ExecutionStatus): React.CSSProperties => {
+    const baseStyle: React.CSSProperties = {
+      padding: '4px 12px',
+      borderRadius: '12px',
+      fontSize: '12px',
+      fontWeight: '500',
+      display: 'inline-block',
+    };
+
+    switch (status) {
+      case 'SUCCESS':
+        return { ...baseStyle, backgroundColor: '#d1fae5', color: '#065f46' };
+      case 'FAILED':
+        return { ...baseStyle, backgroundColor: '#fee2e2', color: '#991b1b' };
+      case 'SKIPPED':
+        return { ...baseStyle, backgroundColor: '#fef3c7', color: '#92400e' };
+      case 'NO_RULES_MATCHED':
+        return { ...baseStyle, backgroundColor: '#f3f4f6', color: '#4b5563' };
+      default:
+        return baseStyle;
+    }
+  };
+
+  // Styles
+  const containerStyle: React.CSSProperties = {
+    padding: '24px',
+    maxWidth: '1400px',
+    margin: '0 auto',
+  };
+
+  const headerStyle: React.CSSProperties = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '24px',
+  };
+
+  const titleStyle: React.CSSProperties = {
+    fontSize: '28px',
+    fontWeight: 'bold',
+    color: '#1f2937',
+  };
+
+  const buttonStyle: React.CSSProperties = {
+    padding: '10px 20px',
+    backgroundColor: '#2563eb',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+  };
+
+  const tabsStyle: React.CSSProperties = {
+    display: 'flex',
+    gap: '8px',
+    marginBottom: '24px',
+    borderBottom: '2px solid #e5e7eb',
+  };
+
+  const tabStyle = (isActive: boolean): React.CSSProperties => ({
+    padding: '12px 24px',
+    backgroundColor: 'transparent',
+    border: 'none',
+    borderBottom: isActive ? '2px solid #2563eb' : 'none',
+    color: isActive ? '#2563eb' : '#6b7280',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    marginBottom: '-2px',
+  });
+
+  const errorBannerStyle: React.CSSProperties = {
+    padding: '12px 16px',
+    backgroundColor: '#fee2e2',
+    border: '1px solid #fecaca',
+    borderRadius: '6px',
+    marginBottom: '16px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    color: '#991b1b',
+  };
+
+  const successBannerStyle: React.CSSProperties = {
+    padding: '12px 16px',
+    backgroundColor: '#d1fae5',
+    border: '1px solid #a7f3d0',
+    borderRadius: '6px',
+    marginBottom: '16px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    color: '#065f46',
+  };
+
+  const cardStyle: React.CSSProperties = {
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    padding: '24px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    marginBottom: '16px',
+  };
+
+  const ruleHeaderStyle: React.CSSProperties = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '12px',
+  };
+
+  const ruleNameStyle: React.CSSProperties = {
+    fontSize: '18px',
+    fontWeight: '600',
+    color: '#1f2937',
+  };
+
+  const ruleActionsStyle: React.CSSProperties = {
+    display: 'flex',
+    gap: '8px',
+  };
+
+  const smallButtonStyle: React.CSSProperties = {
+    padding: '6px 12px',
+    border: '1px solid #d1d5db',
+    borderRadius: '4px',
+    backgroundColor: 'white',
+    cursor: 'pointer',
+    fontSize: '13px',
+  };
+
+  const deleteButtonStyle: React.CSSProperties = {
+    ...smallButtonStyle,
+    color: '#dc2626',
+    borderColor: '#dc2626',
+  };
+
+  const toggleButtonStyle = (isActive: boolean): React.CSSProperties => ({
+    ...smallButtonStyle,
+    backgroundColor: isActive ? '#10b981' : '#6b7280',
+    color: 'white',
+    border: 'none',
+  });
+
+  const ruleDetailsStyle: React.CSSProperties = {
+    fontSize: '14px',
+    color: '#6b7280',
+    marginBottom: '8px',
+  };
+
+  const tableStyle: React.CSSProperties = {
+    width: '100%',
+    borderCollapse: 'collapse',
+  };
+
+  const thStyle: React.CSSProperties = {
+    textAlign: 'left',
+    padding: '12px',
+    borderBottom: '2px solid #e5e7eb',
+    fontSize: '12px',
+    fontWeight: '600',
+    color: '#6b7280',
+    textTransform: 'uppercase',
+  };
+
+  const tdStyle: React.CSSProperties = {
+    padding: '16px 12px',
+    borderBottom: '1px solid #f3f4f6',
+  };
+
+  const modalOverlayStyle: React.CSSProperties = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  };
+
+  const modalStyle: React.CSSProperties = {
+    backgroundColor: 'white',
+    padding: '24px',
+    borderRadius: '8px',
+    width: '90%',
+    maxWidth: '600px',
+    maxHeight: '90vh',
+    overflow: 'auto',
+  };
+
+  const modalHeaderStyle: React.CSSProperties = {
+    fontSize: '20px',
+    fontWeight: 'bold',
+    marginBottom: '20px',
+    color: '#1f2937',
+  };
+
+  const formGroupStyle: React.CSSProperties = {
+    marginBottom: '16px',
+  };
+
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    marginBottom: '6px',
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#374151',
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '8px 12px',
+    border: '1px solid #d1d5db',
+    borderRadius: '6px',
+    fontSize: '14px',
+  };
+
+  const modalButtonContainerStyle: React.CSSProperties = {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '12px',
+    marginTop: '20px',
+  };
+
+  const cancelButtonStyle: React.CSSProperties = {
+    padding: '8px 16px',
+    border: '1px solid #d1d5db',
+    borderRadius: '6px',
+    backgroundColor: 'white',
+    cursor: 'pointer',
+    fontSize: '14px',
+  };
+
+  const submitButtonStyle: React.CSSProperties = {
+    padding: '8px 16px',
+    backgroundColor: '#2563eb',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+  };
+
+  return (
+    <div style={containerStyle}>
+      <div style={headerStyle}>
+        <h1 style={titleStyle}>Automation Rules</h1>
+        {user && (
+          <button
+            style={buttonStyle}
+            onClick={() => {
+              resetForm();
+              setShowCreateModal(true);
+            }}
+            onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#1d4ed8')}
+            onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#2563eb')}
+          >
+            + Create Rule
+          </button>
+        )}
+      </div>
+
+      {error && (
+        <div style={errorBannerStyle}>
+          <span>{error}</span>
+          <button
+            onClick={() => setError(null)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#991b1b',
+              cursor: 'pointer',
+              fontSize: '18px',
+              fontWeight: 'bold',
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {success && (
+        <div style={successBannerStyle}>
+          <span>{success}</span>
+          <button
+            onClick={() => setSuccess(null)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#065f46',
+              cursor: 'pointer',
+              fontSize: '18px',
+              fontWeight: 'bold',
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      <div style={tabsStyle}>
+        <button
+          style={tabStyle(activeTab === 'rules')}
+          onClick={() => setActiveTab('rules')}
+        >
+          Automation Rules ({rules.length})
+        </button>
+        <button
+          style={tabStyle(activeTab === 'logs')}
+          onClick={() => setActiveTab('logs')}
+        >
+          Event Logs ({logs.length})
+        </button>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '48px', color: '#6b7280' }}>
+          Loading...
+        </div>
+      ) : activeTab === 'rules' ? (
+        rules.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '48px', color: '#6b7280' }}>
+            <p style={{ fontSize: '16px', marginBottom: '8px' }}>No automation rules yet</p>
+            <p style={{ fontSize: '14px' }}>Create your first automation rule to get started</p>
+          </div>
+        ) : (
+          <div>
+            {rules.map((rule) => (
+              <div key={rule.id} style={cardStyle}>
+                <div style={ruleHeaderStyle}>
+                  <div style={ruleNameStyle}>{rule.name}</div>
+                  <div style={ruleActionsStyle}>
+                    <button
+                      style={toggleButtonStyle(rule.isActive || false)}
+                      onClick={() => handleToggleStatus(rule.id!, rule.isActive || false)}
+                    >
+                      {rule.isActive ? 'Active' : 'Inactive'}
+                    </button>
+                    <button
+                      style={smallButtonStyle}
+                      onClick={() => openEditModal(rule)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      style={deleteButtonStyle}
+                      onClick={() => handleDelete(rule.id!, rule.name)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+                <div style={ruleDetailsStyle}>
+                  <strong>Event:</strong> {rule.eventType} → <strong>Action:</strong> {rule.actionType}
+                </div>
+                <div style={ruleDetailsStyle}>
+                  <strong>Executions:</strong> {rule.executionCount || 0}
+                  {rule.lastExecutedAt && (
+                    <> • <strong>Last Run:</strong> {new Date(rule.lastExecutedAt).toLocaleString()}</>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      ) : (
+        logs.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '48px', color: '#6b7280' }}>
+            <p style={{ fontSize: '16px', marginBottom: '8px' }}>No event logs yet</p>
+            <p style={{ fontSize: '14px' }}>Event logs will appear here when automation rules are triggered</p>
+          </div>
+        ) : (
+          <div style={{ backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+            <table style={tableStyle}>
+              <thead>
+                <tr>
+                  <th style={thStyle}>Event Type</th>
+                  <th style={thStyle}>Status</th>
+                  <th style={thStyle}>Duration</th>
+                  <th style={thStyle}>Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map((log) => (
+                  <tr key={log.id}>
+                    <td style={tdStyle}>
+                      <span style={{ fontWeight: '500', color: '#1f2937' }}>{log.eventType}</span>
+                      {log.actionType && (
+                        <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px' }}>
+                          Action: {log.actionType}
+                        </div>
+                      )}
+                    </td>
+                    <td style={tdStyle}>
+                      <span style={getStatusBadgeStyle(log.status)}>{log.status}</span>
+                    </td>
+                    <td style={tdStyle}>
+                      {log.executionDurationMs ? `${log.executionDurationMs}ms` : '-'}
+                    </td>
+                    <td style={tdStyle}>
+                      {new Date(log.createdAt).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      )}
+
+      {/* Create Modal */}
+      {showCreateModal && (
+        <div style={modalOverlayStyle} onClick={() => setShowCreateModal(false)}>
+          <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+            <h2 style={modalHeaderStyle}>Create Automation Rule</h2>
+            <form onSubmit={handleCreate}>
+              <div style={formGroupStyle}>
+                <label style={labelStyle}>Rule Name *</label>
+                <input
+                  type="text"
+                  style={inputStyle}
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle}>Event Type *</label>
+                <select
+                  style={inputStyle}
+                  value={formData.eventType}
+                  onChange={(e) => setFormData({ ...formData, eventType: e.target.value })}
+                >
+                  <option value="task.status.changed">Task Status Changed</option>
+                  <option value="task.created">Task Created</option>
+                  <option value="task.updated">Task Updated</option>
+                  <option value="task.deleted">Task Deleted</option>
+                  <option value="project.created">Project Created</option>
+                  <option value="project.updated">Project Updated</option>
+                  <option value="project.deleted">Project Deleted</option>
+                </select>
+              </div>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle}>Action Type *</label>
+                <select
+                  style={inputStyle}
+                  value={formData.actionType}
+                  onChange={(e) => setFormData({ ...formData, actionType: e.target.value })}
+                >
+                  <option value="send_email">Send Email</option>
+                  <option value="call_webhook">Call Webhook</option>
+                  <option value="create_task">Create Task</option>
+                  <option value="send_notification">Send Notification</option>
+                </select>
+              </div>
+
+              <div style={modalButtonContainerStyle}>
+                <button
+                  type="button"
+                  style={cancelButtonStyle}
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    resetForm();
+                  }}
+                >
+                  Cancel
+                </button>
+                <button type="submit" style={submitButtonStyle}>
+                  Create Rule
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && editingRule && (
+        <div style={modalOverlayStyle} onClick={() => setShowEditModal(false)}>
+          <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+            <h2 style={modalHeaderStyle}>Edit Automation Rule</h2>
+            <form onSubmit={handleUpdate}>
+              <div style={formGroupStyle}>
+                <label style={labelStyle}>Rule Name *</label>
+                <input
+                  type="text"
+                  style={inputStyle}
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle}>Event Type *</label>
+                <select
+                  style={inputStyle}
+                  value={formData.eventType}
+                  onChange={(e) => setFormData({ ...formData, eventType: e.target.value })}
+                >
+                  <option value="task.status.changed">Task Status Changed</option>
+                  <option value="task.created">Task Created</option>
+                  <option value="task.updated">Task Updated</option>
+                  <option value="task.deleted">Task Deleted</option>
+                  <option value="project.created">Project Created</option>
+                  <option value="project.updated">Project Updated</option>
+                  <option value="project.deleted">Project Deleted</option>
+                </select>
+              </div>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle}>Action Type *</label>
+                <select
+                  style={inputStyle}
+                  value={formData.actionType}
+                  onChange={(e) => setFormData({ ...formData, actionType: e.target.value })}
+                >
+                  <option value="send_email">Send Email</option>
+                  <option value="call_webhook">Call Webhook</option>
+                  <option value="create_task">Create Task</option>
+                  <option value="send_notification">Send Notification</option>
+                </select>
+              </div>
+
+              <div style={modalButtonContainerStyle}>
+                <button
+                  type="button"
+                  style={cancelButtonStyle}
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingRule(null);
+                    resetForm();
+                  }}
+                >
+                  Cancel
+                </button>
+                <button type="submit" style={submitButtonStyle}>
+                  Update Rule
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default AutomationPage;

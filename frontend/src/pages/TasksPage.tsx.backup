@@ -1,0 +1,887 @@
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { useTenant } from '../contexts/TenantContext';
+import { taskService, Task, CreateTaskRequest, UpdateTaskRequest } from '../services/taskService';
+import { projectService, Project } from '../services/projectService';
+
+type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'BLOCKED' | 'COMPLETED';
+type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+const TasksPage: React.FC = () => {
+  const { user } = useAuth();
+  const { tenant: currentTenant } = useTenant();
+
+  // State
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Filters
+  const [projectFilter, setProjectFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<TaskStatus | ''>('');
+  const [priorityFilter, setPriorityFilter] = useState<Priority | ''>('');
+  const [showOverdueOnly, setShowOverdueOnly] = useState(false);
+
+  // Modals
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+
+  // Form state
+  const [formData, setFormData] = useState<CreateTaskRequest>({
+    projectId: '',
+    name: '',
+    description: '',
+    status: 'TODO',
+    dueDate: '',
+    priority: 'MEDIUM',
+  });
+
+  // Load projects for dropdown
+  useEffect(() => {
+    const loadProjects = async () => {
+      try {
+        const data = await projectService.getAllProjects({ activeOnly: true });
+        setProjects(data);
+      } catch (err: any) {
+        console.error('Failed to load projects:', err);
+      }
+    };
+    loadProjects();
+  }, []);
+
+  // Load tasks
+  useEffect(() => {
+    loadTasks();
+  }, [projectFilter, statusFilter, priorityFilter, showOverdueOnly]);
+
+  const loadTasks = async () => {
+    if (!user || !currentTenant) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const params: any = {};
+      if (projectFilter) params.projectId = projectFilter;
+      if (statusFilter) params.status = statusFilter;
+      if (priorityFilter) params.priority = priorityFilter;
+      if (showOverdueOnly) params.overdueOnly = true;
+
+      const data = await taskService.getAllTasks(params);
+      setTasks(data);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to load tasks');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    try {
+      await taskService.createTask(formData);
+      setShowCreateModal(false);
+      resetForm();
+      loadTasks();
+    } catch (err: any) {
+      if (err.response?.status === 402) {
+        setError('Quota exceeded. Please upgrade your subscription to create more tasks.');
+      } else {
+        setError(err.response?.data?.message || 'Failed to create task');
+      }
+    }
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTask?.id) return;
+
+    setError(null);
+
+    try {
+      const updateRequest: UpdateTaskRequest = {
+        name: formData.name,
+        description: formData.description || undefined,
+        status: formData.status,
+        dueDate: formData.dueDate || undefined,
+        priority: formData.priority,
+        progressPercentage: editingTask.progressPercentage,
+      };
+
+      await taskService.updateTask(editingTask.id, updateRequest);
+      setShowEditModal(false);
+      setEditingTask(null);
+      resetForm();
+      loadTasks();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to update task');
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this task?')) return;
+
+    setError(null);
+
+    try {
+      await taskService.deleteTask(id);
+      loadTasks();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to delete task');
+    }
+  };
+
+  const handleProgressChange = async (task: Task, progress: number) => {
+    if (!task.id) return;
+
+    try {
+      const updateRequest: UpdateTaskRequest = {
+        progressPercentage: progress,
+      };
+      await taskService.updateTask(task.id, updateRequest);
+      loadTasks();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to update progress');
+    }
+  };
+
+  const openEditModal = (task: Task) => {
+    setEditingTask(task);
+    setFormData({
+      projectId: task.projectId,
+      name: task.name,
+      description: task.description || '',
+      status: task.status,
+      dueDate: task.dueDate || '',
+      priority: task.priority,
+    });
+    setShowEditModal(true);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      projectId: '',
+      name: '',
+      description: '',
+      status: 'TODO',
+      dueDate: '',
+      priority: 'MEDIUM',
+    });
+  };
+
+  const isOverdue = (dueDate?: string): boolean => {
+    if (!dueDate) return false;
+    return new Date(dueDate) < new Date();
+  };
+
+  const getStatusStyle = (status: string): React.CSSProperties => {
+    const styles: Record<string, React.CSSProperties> = {
+      TODO: { backgroundColor: '#e5e7eb', color: '#374151' },
+      IN_PROGRESS: { backgroundColor: '#dbeafe', color: '#1e40af' },
+      BLOCKED: { backgroundColor: '#fecaca', color: '#991b1b' },
+      COMPLETED: { backgroundColor: '#d1fae5', color: '#065f46' },
+    };
+    return styles[status] || styles.TODO;
+  };
+
+  const getPriorityStyle = (priority: string): React.CSSProperties => {
+    const styles: Record<string, React.CSSProperties> = {
+      LOW: { backgroundColor: '#dbeafe', color: '#1e40af' },
+      MEDIUM: { backgroundColor: '#fef3c7', color: '#92400e' },
+      HIGH: { backgroundColor: '#fed7aa', color: '#9a3412' },
+      CRITICAL: { backgroundColor: '#fecaca', color: '#991b1b' },
+    };
+    return styles[priority] || styles.MEDIUM;
+  };
+
+  const getProjectName = (projectId: string): string => {
+    const project = projects.find(p => p.id === projectId);
+    return project?.name || 'Unknown Project';
+  };
+
+  const containerStyle: React.CSSProperties = {
+    padding: '24px',
+    maxWidth: '1400px',
+    margin: '0 auto',
+  };
+
+  const headerStyle: React.CSSProperties = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '24px',
+  };
+
+  const titleStyle: React.CSSProperties = {
+    fontSize: '28px',
+    fontWeight: 'bold',
+    color: '#1f2937',
+  };
+
+  const buttonStyle: React.CSSProperties = {
+    padding: '10px 20px',
+    backgroundColor: '#2563eb',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+  };
+
+  const filtersStyle: React.CSSProperties = {
+    display: 'flex',
+    gap: '16px',
+    marginBottom: '24px',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+  };
+
+  const selectStyle: React.CSSProperties = {
+    padding: '8px 12px',
+    border: '1px solid #d1d5db',
+    borderRadius: '6px',
+    fontSize: '14px',
+    backgroundColor: 'white',
+  };
+
+  const checkboxContainerStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  };
+
+  const errorBannerStyle: React.CSSProperties = {
+    padding: '12px 16px',
+    backgroundColor: '#fee2e2',
+    border: '1px solid #fecaca',
+    borderRadius: '6px',
+    marginBottom: '16px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    color: '#991b1b',
+  };
+
+  const tableStyle: React.CSSProperties = {
+    width: '100%',
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    overflow: 'hidden',
+  };
+
+  const tableHeaderStyle: React.CSSProperties = {
+    backgroundColor: '#f9fafb',
+    borderBottom: '1px solid #e5e7eb',
+  };
+
+  const thStyle: React.CSSProperties = {
+    padding: '12px 16px',
+    textAlign: 'left',
+    fontSize: '12px',
+    fontWeight: '600',
+    color: '#6b7280',
+    textTransform: 'uppercase',
+  };
+
+  const tdStyle: React.CSSProperties = {
+    padding: '16px',
+    borderBottom: '1px solid #f3f4f6',
+  };
+
+  const badgeStyle: React.CSSProperties = {
+    display: 'inline-block',
+    padding: '4px 12px',
+    borderRadius: '12px',
+    fontSize: '12px',
+    fontWeight: '500',
+  };
+
+  const overdueBadgeStyle: React.CSSProperties = {
+    ...badgeStyle,
+    backgroundColor: '#fecaca',
+    color: '#991b1b',
+    marginLeft: '8px',
+  };
+
+  const progressBarContainerStyle: React.CSSProperties = {
+    width: '120px',
+    height: '8px',
+    backgroundColor: '#e5e7eb',
+    borderRadius: '4px',
+    overflow: 'hidden',
+  };
+
+  const progressBarFillStyle = (progress: number): React.CSSProperties => ({
+    height: '100%',
+    width: `${progress}%`,
+    backgroundColor: progress === 100 ? '#10b981' : '#3b82f6',
+    transition: 'width 0.3s ease',
+  });
+
+  const actionButtonStyle: React.CSSProperties = {
+    padding: '6px 12px',
+    marginRight: '8px',
+    border: '1px solid #d1d5db',
+    borderRadius: '4px',
+    backgroundColor: 'white',
+    cursor: 'pointer',
+    fontSize: '13px',
+  };
+
+  const deleteButtonStyle: React.CSSProperties = {
+    ...actionButtonStyle,
+    color: '#dc2626',
+    borderColor: '#dc2626',
+  };
+
+  const modalOverlayStyle: React.CSSProperties = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  };
+
+  const modalStyle: React.CSSProperties = {
+    backgroundColor: 'white',
+    padding: '24px',
+    borderRadius: '8px',
+    width: '90%',
+    maxWidth: '500px',
+    maxHeight: '90vh',
+    overflow: 'auto',
+  };
+
+  const modalHeaderStyle: React.CSSProperties = {
+    fontSize: '20px',
+    fontWeight: 'bold',
+    marginBottom: '20px',
+    color: '#1f2937',
+  };
+
+  const formGroupStyle: React.CSSProperties = {
+    marginBottom: '16px',
+  };
+
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    marginBottom: '6px',
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#374151',
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '8px 12px',
+    border: '1px solid #d1d5db',
+    borderRadius: '6px',
+    fontSize: '14px',
+  };
+
+  const textareaStyle: React.CSSProperties = {
+    ...inputStyle,
+    minHeight: '80px',
+    resize: 'vertical',
+  };
+
+  const modalButtonContainerStyle: React.CSSProperties = {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '12px',
+    marginTop: '20px',
+  };
+
+  const cancelButtonStyle: React.CSSProperties = {
+    padding: '8px 16px',
+    border: '1px solid #d1d5db',
+    borderRadius: '6px',
+    backgroundColor: 'white',
+    cursor: 'pointer',
+    fontSize: '14px',
+  };
+
+  const submitButtonStyle: React.CSSProperties = {
+    padding: '8px 16px',
+    backgroundColor: '#2563eb',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+  };
+
+  const progressSliderStyle: React.CSSProperties = {
+    width: '100%',
+    marginTop: '8px',
+  };
+
+  const emptyStateStyle: React.CSSProperties = {
+    textAlign: 'center',
+    padding: '48px 24px',
+    color: '#6b7280',
+  };
+
+  return (
+    <div style={containerStyle}>
+      <div style={headerStyle}>
+        <h1 style={titleStyle}>Tasks</h1>
+        <button
+          style={buttonStyle}
+          onClick={() => {
+            resetForm();
+            setShowCreateModal(true);
+          }}
+          onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#1d4ed8')}
+          onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#2563eb')}
+        >
+          + Create Task
+        </button>
+      </div>
+
+      {error && (
+        <div style={errorBannerStyle}>
+          <span>{error}</span>
+          <button
+            onClick={() => setError(null)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#991b1b',
+              cursor: 'pointer',
+              fontSize: '18px',
+              fontWeight: 'bold',
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      <div style={filtersStyle}>
+        <select
+          value={projectFilter}
+          onChange={(e) => setProjectFilter(e.target.value)}
+          style={selectStyle}
+        >
+          <option value="">All Projects</option>
+          {projects.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as TaskStatus | '')}
+          style={selectStyle}
+        >
+          <option value="">All Statuses</option>
+          <option value="TODO">To Do</option>
+          <option value="IN_PROGRESS">In Progress</option>
+          <option value="BLOCKED">Blocked</option>
+          <option value="COMPLETED">Completed</option>
+        </select>
+
+        <select
+          value={priorityFilter}
+          onChange={(e) => setPriorityFilter(e.target.value as Priority | '')}
+          style={selectStyle}
+        >
+          <option value="">All Priorities</option>
+          <option value="LOW">Low</option>
+          <option value="MEDIUM">Medium</option>
+          <option value="HIGH">High</option>
+          <option value="CRITICAL">Critical</option>
+        </select>
+
+        <div style={checkboxContainerStyle}>
+          <input
+            type="checkbox"
+            id="overdueOnly"
+            checked={showOverdueOnly}
+            onChange={(e) => setShowOverdueOnly(e.target.checked)}
+          />
+          <label htmlFor="overdueOnly" style={{ fontSize: '14px', cursor: 'pointer' }}>
+            Overdue Only
+          </label>
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '48px', color: '#6b7280' }}>
+          Loading tasks...
+        </div>
+      ) : tasks.length === 0 ? (
+        <div style={emptyStateStyle}>
+          <p style={{ fontSize: '16px', marginBottom: '8px' }}>No tasks found</p>
+          <p style={{ fontSize: '14px' }}>Create your first task to get started</p>
+        </div>
+      ) : (
+        <div style={tableStyle}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead style={tableHeaderStyle}>
+              <tr>
+                <th style={thStyle}>Task Name</th>
+                <th style={thStyle}>Project</th>
+                <th style={thStyle}>Status</th>
+                <th style={thStyle}>Priority</th>
+                <th style={thStyle}>Progress</th>
+                <th style={thStyle}>Due Date</th>
+                <th style={thStyle}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tasks.map((task) => (
+                <tr key={task.id}>
+                  <td style={tdStyle}>
+                    <div style={{ fontWeight: '500', color: '#1f2937' }}>
+                      {task.name}
+                      {isOverdue(task.dueDate) && task.status !== 'COMPLETED' && (
+                        <span style={overdueBadgeStyle}>Overdue</span>
+                      )}
+                    </div>
+                    {task.description && (
+                      <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px' }}>
+                        {task.description}
+                      </div>
+                    )}
+                  </td>
+                  <td style={tdStyle}>
+                    <span style={{ fontSize: '14px', color: '#4b5563' }}>
+                      {getProjectName(task.projectId)}
+                    </span>
+                  </td>
+                  <td style={tdStyle}>
+                    <span style={{ ...badgeStyle, ...getStatusStyle(task.status) }}>
+                      {task.status.replace('_', ' ')}
+                    </span>
+                  </td>
+                  <td style={tdStyle}>
+                    <span style={{ ...badgeStyle, ...getPriorityStyle(task.priority) }}>
+                      {task.priority}
+                    </span>
+                  </td>
+                  <td style={tdStyle}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={progressBarContainerStyle}>
+                        <div style={progressBarFillStyle(task.progressPercentage || 0)} />
+                      </div>
+                      <span style={{ fontSize: '13px', color: '#6b7280', minWidth: '35px' }}>
+                        {task.progressPercentage || 0}%
+                      </span>
+                    </div>
+                  </td>
+                  <td style={tdStyle}>
+                    {task.dueDate ? (
+                      <span
+                        style={{
+                          fontSize: '14px',
+                          color: isOverdue(task.dueDate) && task.status !== 'COMPLETED' ? '#dc2626' : '#4b5563',
+                        }}
+                      >
+                        {new Date(task.dueDate).toLocaleDateString()}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '14px', color: '#9ca3af' }}>-</span>
+                    )}
+                  </td>
+                  <td style={tdStyle}>
+                    <button
+                      style={actionButtonStyle}
+                      onClick={() => openEditModal(task)}
+                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
+                      onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'white')}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      style={deleteButtonStyle}
+                      onClick={() => task.id && handleDelete(task.id)}
+                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#fef2f2')}
+                      onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'white')}
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Create Modal */}
+      {showCreateModal && (
+        <div style={modalOverlayStyle} onClick={() => setShowCreateModal(false)}>
+          <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+            <h2 style={modalHeaderStyle}>Create New Task</h2>
+            <form onSubmit={handleCreate}>
+              <div style={formGroupStyle}>
+                <label style={labelStyle} htmlFor="projectId">
+                  Project *
+                </label>
+                <select
+                  id="projectId"
+                  style={inputStyle}
+                  value={formData.projectId}
+                  onChange={(e) => setFormData({ ...formData, projectId: e.target.value })}
+                  required
+                >
+                  <option value="">Select a project</option>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle} htmlFor="name">
+                  Task Name *
+                </label>
+                <input
+                  id="name"
+                  type="text"
+                  style={inputStyle}
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle} htmlFor="description">
+                  Description
+                </label>
+                <textarea
+                  id="description"
+                  style={textareaStyle}
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                />
+              </div>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle} htmlFor="status">
+                  Status
+                </label>
+                <select
+                  id="status"
+                  style={inputStyle}
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value as TaskStatus })}
+                >
+                  <option value="TODO">To Do</option>
+                  <option value="IN_PROGRESS">In Progress</option>
+                  <option value="BLOCKED">Blocked</option>
+                  <option value="COMPLETED">Completed</option>
+                </select>
+              </div>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle} htmlFor="priority">
+                  Priority
+                </label>
+                <select
+                  id="priority"
+                  style={inputStyle}
+                  value={formData.priority}
+                  onChange={(e) => setFormData({ ...formData, priority: e.target.value as Priority })}
+                >
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HIGH">High</option>
+                  <option value="CRITICAL">Critical</option>
+                </select>
+              </div>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle} htmlFor="dueDate">
+                  Due Date
+                </label>
+                <input
+                  id="dueDate"
+                  type="date"
+                  style={inputStyle}
+                  value={formData.dueDate}
+                  onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                />
+              </div>
+
+              <div style={modalButtonContainerStyle}>
+                <button
+                  type="button"
+                  style={cancelButtonStyle}
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    resetForm();
+                  }}
+                >
+                  Cancel
+                </button>
+                <button type="submit" style={submitButtonStyle}>
+                  Create Task
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && editingTask && (
+        <div style={modalOverlayStyle} onClick={() => setShowEditModal(false)}>
+          <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+            <h2 style={modalHeaderStyle}>Edit Task</h2>
+            <form onSubmit={handleUpdate}>
+              <div style={formGroupStyle}>
+                <label style={labelStyle} htmlFor="edit-projectId">
+                  Project *
+                </label>
+                <select
+                  id="edit-projectId"
+                  style={inputStyle}
+                  value={formData.projectId}
+                  onChange={(e) => setFormData({ ...formData, projectId: e.target.value })}
+                  required
+                >
+                  <option value="">Select a project</option>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle} htmlFor="edit-name">
+                  Task Name *
+                </label>
+                <input
+                  id="edit-name"
+                  type="text"
+                  style={inputStyle}
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle} htmlFor="edit-description">
+                  Description
+                </label>
+                <textarea
+                  id="edit-description"
+                  style={textareaStyle}
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                />
+              </div>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle} htmlFor="edit-status">
+                  Status
+                </label>
+                <select
+                  id="edit-status"
+                  style={inputStyle}
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value as TaskStatus })}
+                >
+                  <option value="TODO">To Do</option>
+                  <option value="IN_PROGRESS">In Progress</option>
+                  <option value="BLOCKED">Blocked</option>
+                  <option value="COMPLETED">Completed</option>
+                </select>
+              </div>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle} htmlFor="edit-priority">
+                  Priority
+                </label>
+                <select
+                  id="edit-priority"
+                  style={inputStyle}
+                  value={formData.priority}
+                  onChange={(e) => setFormData({ ...formData, priority: e.target.value as Priority })}
+                >
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HIGH">High</option>
+                  <option value="CRITICAL">Critical</option>
+                </select>
+              </div>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle} htmlFor="edit-progress">
+                  Progress: {editingTask.progressPercentage || 0}%
+                </label>
+                <input
+                  id="edit-progress"
+                  type="range"
+                  min="0"
+                  max="100"
+                  style={progressSliderStyle}
+                  value={editingTask.progressPercentage || 0}
+                  onChange={(e) => {
+                    const newProgress = parseInt(e.target.value);
+                    setEditingTask({ ...editingTask, progressPercentage: newProgress });
+                  }}
+                />
+              </div>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle} htmlFor="edit-dueDate">
+                  Due Date
+                </label>
+                <input
+                  id="edit-dueDate"
+                  type="date"
+                  style={inputStyle}
+                  value={formData.dueDate}
+                  onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                />
+              </div>
+
+              <div style={modalButtonContainerStyle}>
+                <button
+                  type="button"
+                  style={cancelButtonStyle}
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingTask(null);
+                    resetForm();
+                  }}
+                >
+                  Cancel
+                </button>
+                <button type="submit" style={submitButtonStyle}>
+                  Update Task
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default TasksPage;
