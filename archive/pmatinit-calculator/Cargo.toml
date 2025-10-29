@@ -1,0 +1,43 @@
+[package]
+name = "pmatinit"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "A powerful command-line calculator with variables, functions, and an enhanced interactive REPL"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/yourusername/pmatinit"
+documentation = "https://docs.rs/pmatinit"
+homepage = "https://github.com/yourusername/pmatinit"
+readme = "README.md"
+keywords = ["calculator", "cli", "repl", "mathematics", "scientific"]
+categories = ["command-line-utilities", "mathematics"]
+exclude = [
+    "docs/todo/",
+    ".claude/",
+    ".idea/",
+    "*.md",
+    "!README.md",
+    "!CHANGELOG.md",
+]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[[bin]]
+name = "pmatinit"
+path = "src/main.rs"
+
+[lib]
+name = "pmatinit"
+path = "src/lib.rs"
+
+[dependencies]
+pmat = "=2.170.0"
+clap = { version = "4.5", features = ["derive"] }
+rustyline = "14.0"
+anyhow = "1.0"
+thiserror = "2.0"
+ansi_term = "0.12"
+similar = "2.4"
+dirs = "5.0"
