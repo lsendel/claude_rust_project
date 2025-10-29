@@ -1,0 +1,84 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest"
+      ],
+      "env": {}
+    },
+    "cloudflare-docs": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://docs.mcp.cloudflare.com/sse"
+      ],
+      "env": {}
+    },
+    "cloudflare-radar": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://radar.mcp.cloudflare.com/sse"
+      ],
+      "env": {}
+    },
+    "cloudflare-ai-gateway": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://ai-gateway.mcp.cloudflare.com/sse"
+      ],
+      "env": {}
+    },
+    "cloudflare-browser-rendering": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://browser.mcp.cloudflare.com/sse"
+      ],
+      "env": {}
+    },
+    "cloudflare-dns-analytics": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://dns-analytics.mcp.cloudflare.com/sse"
+      ],
+      "env": {}
+    },
+    "ref": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://api.ref.tools/mcp",
+        "--transport",
+        "http",
+        "--header",
+        "x-ref-api-key:ref-f517346ac231ad46ef66"
+      ],
+      "env": {}
+    },
+    "pmat": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "pmat-agent", "mcp"],
+      "env": {}
+    },
+    "shadcn": {
+      "command": "npx",
+      "args": [
+        "shadcn@latest",
+        "mcp"
+      ],
+      "env": {}
+    }
+  }
+}

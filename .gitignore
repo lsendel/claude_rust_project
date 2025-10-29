@@ -1,8 +1,65 @@
-# Rust build artifacts
-/target/
-Cargo.lock
+# ============================================================================
+# Multi-Tenant SaaS Platform - Ignore Patterns
+# ============================================================================
 
-# IntelliJ IDEA / RustRover
+# ============================================================================
+# Java / Spring Boot / Maven
+# ============================================================================
+backend/target/
+backend/.mvn/
+backend/mvnw
+backend/mvnw.cmd
+*.class
+*.jar
+*.war
+*.ear
+*.log
+*.tmp
+.factorypath
+.project
+.classpath
+.settings/
+.springBeans
+.sts4-cache/
+
+# ============================================================================
+# Node.js / React / Frontend
+# ============================================================================
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.vite/
+lambda-functions/node_modules/
+lambda-functions/dist/
+node_modules/
+package-lock.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.npm
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# ============================================================================
+# Terraform / Infrastructure
+# ============================================================================
+infrastructure/terraform/.terraform/
+infrastructure/terraform/.terraform.lock.hcl
+infrastructure/terraform/*.tfstate
+infrastructure/terraform/*.tfstate.backup
+infrastructure/terraform/*.tfvars
+infrastructure/terraform/.terraformrc
+infrastructure/terraform/terraform.rc
+*.tfplan
+
+# ============================================================================
+# IDEs and Editors
+# ============================================================================
+# IntelliJ IDEA
 .idea/
 *.iml
 *.ipr
@@ -13,19 +70,69 @@ out/
 .vscode/
 *.code-workspace
 
-# Environment variables
+# Eclipse
+.project
+.classpath
+.settings/
+.metadata/
+
+# NetBeans
+nbproject/
+nbbuild/
+nbdist/
+.nb-gradle/
+
+# ============================================================================
+# Environment and Secrets
+# ============================================================================
 .env
 .env.local
-.env.*.local
-.envrc
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*
+*.env
+secrets/
+*.key
+*.pem
+*.crt
+*.p12
+*.jks
 
-# Logs
+# ============================================================================
+# AWS / Cloud
+# ============================================================================
+.aws/
+aws-exports.js
+amplify/
+.amplify/
+
+# ============================================================================
+# Testing and Coverage
+# ============================================================================
+coverage/
+.nyc_output/
+*.lcov
+test-results/
+junit.xml
+.pytest_cache/
+
+# ============================================================================
+# Logs and Temporary Files
+# ============================================================================
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+*.log.*
+logs/
+tmp/
+temp/
+*.tmp
+*.swp
+*.swo
+*~
 
-# OS files
+# ============================================================================
+# Operating System Files
+# ============================================================================
 .DS_Store
 .DS_Store?
 ._*
@@ -33,21 +140,31 @@ yarn-error.log*
 .Trashes
 ehthumbs.db
 Thumbs.db
-Desktop.ini
+desktop.ini
 
-# Backup files
-*~
-*.swp
-*.swo
-*.bak
+# ============================================================================
+# Docker
+# ============================================================================
+docker-compose.override.yml
+.dockerignore
 
-# Profiling
-perf.data
-perf.data.old
-flamegraph.svg
+# ============================================================================
+# Database
+# ============================================================================
+*.db
+*.sqlite
+*.sqlite3
 
-# Test coverage
-*.profraw
-*.profdata
-coverage/
-lcov.info
+# ============================================================================
+# Archive (Preserved Old Code)
+# ============================================================================
+# Keep archive/ directory but ignore build artifacts within it
+archive/pmatinit-calculator/target/
+
+# ============================================================================
+# Miscellaneous
+# ============================================================================
+.cache/
+.parcel-cache/
+dist-ssr/
+*.local

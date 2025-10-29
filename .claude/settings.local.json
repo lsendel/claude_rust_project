@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo --version)",
+      "Bash(rustc --version)",
+      "Bash(cargo:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nInitial commit: Rust project setup with gitignore\n\n- Add comprehensive .gitignore for Rust projects\n- Configure Cargo.toml with Rust 2021 edition\n- Include basic main.rs starter file\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git push:*)",
+      "Bash(gh pr:*)",
+      "WebFetch(domain:ui.shadcn.com)",
+      "Bash(npx shadcn@latest mcp init --client claude)"
+    ],
+    "deny": [],
+    "ask": []
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "playwright",
+    "cloudflare-docs",
+    "cloudflare-radar",
+    "cloudflare-ai-gateway",
+    "cloudflare-browser-rendering",
+    "cloudflare-dns-analytics",
+    "ref",
+    "pmat"
+  ]
+}

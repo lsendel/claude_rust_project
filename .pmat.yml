@@ -1,0 +1,363 @@
+# PMAT Configuration for Multi-Tenant SaaS Platform
+# Version: 1.0
+# Generated: 2025-10-27
+
+version: 1.0
+name: "Multi-Tenant SaaS Platform"
+description: "PMAT validation thresholds for backend (Java/Spring Boot) and frontend (React/TypeScript)"
+
+# Global settings
+global:
+  fail_on_violation: true
+  generate_reports: true
+  report_format: ["markdown", "json", "html"]
+  output_directory: "./pmat-reports"
+
+# Backend thresholds (Java/Spring Boot)
+backend:
+  # REST API Controllers
+  controllers:
+    cyclomatic_complexity: 12
+    cognitive_complexity: 20
+    maintainability_index: 65
+    lines_of_code: 250
+    test_coverage: 80
+    description: "REST API controllers handling HTTP requests"
+
+  # Business logic services
+  services:
+    cyclomatic_complexity: 10
+    cognitive_complexity: 15
+    maintainability_index: 70
+    lines_of_code: 300
+    test_coverage: 85
+    description: "Core business logic and orchestration"
+
+  # Data access repositories
+  repositories:
+    cyclomatic_complexity: 5
+    cognitive_complexity: 10
+    maintainability_index: 80
+    lines_of_code: 150
+    test_coverage: 90
+    description: "JPA repositories for database access"
+
+  # Domain entities
+  entities:
+    cyclomatic_complexity: 8
+    cognitive_complexity: 12
+    maintainability_index: 75
+    lines_of_code: 200
+    test_coverage: 70
+    description: "JPA entities representing domain models"
+
+  # Configuration classes
+  configuration:
+    cyclomatic_complexity: 8
+    cognitive_complexity: 15
+    maintainability_index: 70
+    lines_of_code: 200
+    test_coverage: 75
+    description: "Spring Boot configuration beans"
+
+  # Security components
+  security:
+    cyclomatic_complexity: 10
+    cognitive_complexity: 18
+    maintainability_index: 70
+    lines_of_code: 250
+    test_coverage: 90
+    description: "Authentication and authorization logic"
+
+  # Event publishers
+  events:
+    cyclomatic_complexity: 8
+    cognitive_complexity: 12
+    maintainability_index: 70
+    lines_of_code: 200
+    test_coverage: 85
+    description: "Domain event publishing and handling"
+
+# Frontend thresholds (TypeScript/React)
+frontend:
+  # Complex page components (Dashboard, Settings, etc.)
+  pages:
+    complex:
+      cyclomatic_complexity: 15
+      cognitive_complexity: 30
+      maintainability_index: 60
+      lines_of_code: 500
+      test_coverage: 75
+      description: "Complex pages with multiple features"
+
+    simple:
+      cyclomatic_complexity: 10
+      cognitive_complexity: 20
+      maintainability_index: 65
+      lines_of_code: 300
+      test_coverage: 80
+      description: "Simple pages with single focus"
+
+  # Reusable UI components
+  components:
+    cyclomatic_complexity: 8
+    cognitive_complexity: 15
+    maintainability_index: 70
+    lines_of_code: 200
+    test_coverage: 85
+    description: "Reusable UI components"
+
+  # API service clients
+  services:
+    cyclomatic_complexity: 10
+    cognitive_complexity: 15
+    maintainability_index: 70
+    lines_of_code: 250
+    test_coverage: 85
+    description: "API client services using axios"
+
+  # Custom React hooks
+  hooks:
+    cyclomatic_complexity: 6
+    cognitive_complexity: 10
+    maintainability_index: 75
+    lines_of_code: 100
+    test_coverage: 90
+    description: "Custom React hooks for state/logic reuse"
+
+  # Context providers
+  contexts:
+    cyclomatic_complexity: 8
+    cognitive_complexity: 15
+    maintainability_index: 70
+    lines_of_code: 200
+    test_coverage: 85
+    description: "React Context providers for global state"
+
+# Test coverage requirements
+test_coverage:
+  minimum: 85
+  critical_files: 95
+  integration_tests: 70
+  unit_tests: 90
+
+  # Files that MUST have high coverage
+  critical_paths:
+    - "backend/src/main/java/com/platform/saas/security/**"
+    - "backend/src/main/java/com/platform/saas/service/**"
+    - "frontend/src/services/**"
+    - "frontend/src/contexts/**"
+
+# Technical debt tracking
+technical_debt:
+  max_todo_count: 10
+  max_fixme_count: 5
+  max_hack_count: 0
+  max_deprecated_count: 5
+
+  # SATD (Self-Admitted Technical Debt) patterns
+  satd_patterns:
+    - "TODO"
+    - "FIXME"
+    - "HACK"
+    - "XXX"
+    - "DEPRECATED"
+    - "TEMP"
+    - "REFACTOR"
+
+# Code smells detection
+code_smells:
+  # Method-level smells
+  long_method: 50  # lines
+  long_parameter_list: 5  # parameters
+  deeply_nested_conditionals: 4  # levels
+
+  # Class-level smells
+  large_class: 500  # lines
+  too_many_methods: 20  # methods
+  god_class_threshold: 15  # responsibilities
+
+  # File-level smells
+  duplicate_code_threshold: 0.05  # 5% duplication
+  commented_out_code: false  # fail if found
+
+# Performance thresholds
+performance:
+  max_function_execution_time: 1000  # milliseconds
+  max_database_query_time: 500  # milliseconds
+  max_api_response_time: 2000  # milliseconds
+
+# Security checks
+security:
+  check_hardcoded_secrets: true
+  check_sql_injection: true
+  check_xss_vulnerabilities: true
+  check_insecure_dependencies: true
+
+  # Patterns to flag as security risks
+  security_patterns:
+    - "password\\s*=\\s*['\"]"
+    - "api[_-]?key\\s*=\\s*['\"]"
+    - "secret\\s*=\\s*['\"]"
+    - "token\\s*=\\s*['\"]"
+
+# CI/CD integration
+ci_cd:
+  # GitHub Actions integration
+  github_actions:
+    enabled: true
+    fail_build_on_violation: true
+    post_comment_on_pr: true
+    generate_badge: true
+
+  # Pre-commit hooks
+  pre_commit:
+    enabled: true
+    check_complexity: true
+    check_coverage: true
+    check_smells: true
+
+  # Quality gates
+  quality_gates:
+    - name: "Critical Complexity"
+      threshold: 0
+      metric: "critical_violations"
+      action: "fail"
+
+    - name: "Test Coverage"
+      threshold: 85
+      metric: "test_coverage_percentage"
+      action: "fail"
+
+    - name: "Technical Debt"
+      threshold: 10
+      metric: "satd_count"
+      action: "warn"
+
+# File exclusions
+exclude:
+  paths:
+    - "**/node_modules/**"
+    - "**/target/**"
+    - "**/dist/**"
+    - "**/build/**"
+    - "**/*.test.js"
+    - "**/*.test.ts"
+    - "**/*.test.tsx"
+    - "**/*.spec.js"
+    - "**/*.spec.ts"
+    - "**/test-utils/**"
+    - "**/__tests__/**"
+    - "**/__mocks__/**"
+    - "**/coverage/**"
+    - "**/.git/**"
+    - "**/migrations/**"  # Database migrations are auto-generated
+
+  files:
+    - "*.md"
+    - "*.json"
+    - "*.yml"
+    - "*.yaml"
+    - "*.xml"
+    - "*.properties"
+    - "Dockerfile"
+    - ".gitignore"
+    - ".dockerignore"
+
+# Reporting configuration
+reporting:
+  # Metrics to track
+  metrics:
+    - cyclomatic_complexity
+    - cognitive_complexity
+    - maintainability_index
+    - lines_of_code
+    - test_coverage
+    - technical_debt
+    - code_smells
+    - duplication
+
+  # Report formats
+  formats:
+    - markdown
+    - html
+    - json
+    - junit  # For CI/CD integration
+
+  # Trend analysis
+  trends:
+    enabled: true
+    history_days: 90
+    compare_with_baseline: true
+
+# Notifications
+notifications:
+  # Slack integration (optional)
+  slack:
+    enabled: false
+    webhook_url: "${SLACK_WEBHOOK_URL}"
+    notify_on_violation: true
+    notify_on_improvement: true
+
+  # Email notifications (optional)
+  email:
+    enabled: false
+    recipients:
+      - "dev-team@example.com"
+    notify_on_violation: true
+
+# Custom rules (project-specific)
+custom_rules:
+  # Multi-tenant isolation check
+  - name: "Tenant Isolation Check"
+    description: "Ensure all queries include tenant_id filtering"
+    pattern: "findBy.*\\((?!.*tenantId).*\\)"
+    severity: "error"
+    files: "backend/src/main/java/**/repository/**"
+
+  # React component naming
+  - name: "React Component Naming"
+    description: "Component files must use PascalCase"
+    pattern: "^[a-z].*\\.tsx$"
+    severity: "warning"
+    files: "frontend/src/components/**"
+
+  # No console.log in production
+  - name: "No Console Logs"
+    description: "Remove console.log statements from production code"
+    pattern: "console\\.log\\("
+    severity: "warning"
+    files: "frontend/src/**/*.ts"
+    exclude_files: "**/*.test.ts"
+
+# Baseline (for gradual improvement)
+baseline:
+  enabled: true
+  file: ".pmat-baseline.json"
+  update_on_improvement: true
+  lock_on_regression: true
+
+# PMAT version compatibility
+pmat_version:
+  minimum: "2.170.0"
+  recommended: "2.173.0"
+
+# Additional settings
+settings:
+  # Analysis parallelization
+  parallel_analysis: true
+  max_workers: 4
+
+  # Cache for faster analysis
+  cache_enabled: true
+  cache_directory: ".pmat-cache"
+
+  # Verbose output
+  verbose: false
+  debug: false
+
+  # Color output
+  color_output: true
+
+  # Progress indicator
+  show_progress: true

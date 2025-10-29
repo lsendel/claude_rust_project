@@ -1,0 +1,56 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: [ main, develop, '001-saas-platform' ]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'frontend/**'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Run linter
+        working-directory: ./frontend
+        run: npm run lint
+
+      - name: Type check
+        working-directory: ./frontend
+        run: npm run type-check
+
+      - name: Run tests
+        working-directory: ./frontend
+        run: npm test -- --run
+
+      - name: Build application
+        working-directory: ./frontend
+        run: npm run build
+
+      - name: Check bundle size
+        working-directory: ./frontend
+        run: |
+          SIZE=$(du -sb dist | cut -f1)
+          MAX_SIZE=512000  # 500KB gzipped target
+          if [ $SIZE -gt $MAX_SIZE ]; then
+            echo "Bundle size $SIZE exceeds maximum $MAX_SIZE"
+            exit 1
+          fi
